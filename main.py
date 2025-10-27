@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Callable, Dict, Tuple
 
 class Command(Enum):
     HELLO = 1
@@ -9,68 +10,90 @@ class Command(Enum):
     CLOSE = 6
     EXIT = 7
 
-def input_error(func):
+def input_error(func: Callable):
     def inner(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except KeyError:
-            return "Write correct command for adding contact to dictionary"
+        except KeyError as e:
+            return str(e) if str(e) else "No such contact in the address book."
         except ValueError as e:
             return str(e)
-        
+        except Exception:
+            return "An unexpected error occurred. Please try again."
     return inner
 
-def parse_command(user_input: str):
+
+def parse_command(user_input: str) -> Tuple[str, ...]:
+    user_input = user_input.strip()
+    if not user_input:
+        return ("",)
+
     cmd, *args = user_input.split()
     cmd = cmd.strip().upper()
-    return cmd, *args
-    
-@input_error
-def add_contact(args, contacts):
-    name, phone = args
-    name = name.strip()
-    phone = phone.strip()
-    
-    if not name:
-        raise ValueError("The name must not be empty")
-    
-    if name in contacts.keys():
-        raise ValueError('Write correct command for changing information')
-    
-    if not (phone.startswith('+') and phone[1:].isdigit() or phone.isdigit()):
-        raise ValueError("The phone number must contain only digits (and optionally a leading ‘+’)")
-    
-    contacts[name] = phone
-    return 'Contact added'
+    return (cmd, *args)
+
+
+def _is_valid_phone(phone: str) -> bool:
+    return (phone.startswith("+") and phone[1:].isdigit()) or phone.isdigit()
+
 
 @input_error
-def change_contact(args, contacts):
+def add_contact(args, contacts: Dict[str, str]) -> str:
+    if len(args) != 2:
+        raise ValueError("Usage: add name phone")
     name, phone = args
-    name = name.strip()
-    phone = phone.strip()
-    
+    if name in contacts:
+        raise ValueError("Contact already exists. Use: change name phone")
+    if not _is_valid_phone(phone):
+        raise ValueError("The phone must contain only digits (optionally starting with '+').")
     contacts[name] = phone
-    return 'Contact added'
+    return "Contact added."
+
 
 @input_error
-def show_phone(args, contacts):
-    name, = args
-    name = name.strip()
-    
+def change_contact(args, contacts: Dict[str, str]) -> str:
+    if len(args) != 2:
+        raise ValueError("Usage: change name phone")
+    name, phone = args
+    if name not in contacts:
+        raise ValueError("No such contact in the address book. Add it first with: add name phone.")
+    if not _is_valid_phone(phone):
+        raise ValueError("The phone must contain only digits (optionally starting with '+').")
+    contacts[name] = phone
+    return "Contact updated."
+
+
+@input_error
+def show_phone(args, contacts: Dict[str, str]) -> str:
+    if len(args) != 1:
+        raise ValueError("Usage: phone <name>")
+    (name,) = args
+    if name not in contacts:
+        raise KeyError("No such contact in the address book.")
     return contacts[name]
 
-def show_all(contacts):
+
+def show_all(contacts: Dict[str, str]) -> str:
+    if not contacts:
+        return "No contacts yet"
     return ", ".join(f"{k} - {v}" for k, v in contacts.items())
 
 
-def main(): 
-    contacts = {}
+def main() -> None:
+    contacts: Dict[str, str] = {}
     print("Welcome to the assistant bot!")
+
     while True:
         user_input = input("Enter a command ")
-        command, *args = parse_command(user_input)
+        parsed = parse_command(user_input)
 
-        if command == Command.CLOSE.name or command == Command.EXIT.name:
+        if not parsed or not parsed[0]:
+            print("Unknown command. Available: " + ", ".join(c.name.lower() for c in Command))
+            continue
+
+        command, *args = parsed
+
+        if command in {Command.CLOSE.name, Command.EXIT.name}:
             break
         elif command == Command.ADD.name:
             print(add_contact(args, contacts))
@@ -81,13 +104,9 @@ def main():
         elif command == Command.ALL.name:
             print(show_all(contacts))
         elif command == Command.HELLO.name:
-            print('How can I help you?')
+            print("How can I help you?")
         else:
-            print('Write correct comamnd: ')
-            for correct_command in (Command):
-                print(correct_command.name.lower())
-
-
+            print("Unknown command. Available: " + ", ".join(c.name.lower() for c in Command))
 
 
 if __name__ == "__main__":

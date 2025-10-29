@@ -29,9 +29,6 @@ def parse_command(user_input: str) -> Tuple[str, ...]:
     cmd, *args = user_input.split()
     cmd = cmd.strip().upper()
 
-    if len(args) == 0:
-        raise ValueError("Enter the argument for the command")
-
     return (cmd, *args)
 
 
